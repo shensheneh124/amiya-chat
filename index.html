@@ -401,7 +401,6 @@
 
         function renderMessages() {
             // 清空除了loading以外的内容
-            // 重新构建DOM
             chatContainer.innerHTML = '';
             
             messages.forEach((msg, index) => {
@@ -409,24 +408,26 @@
 
                 const isUser = msg.role === 'user';
                 const wrapper = document.createElement('div');
-                wrapper.className = `flex w-full animate-fade-in ${isUser ? 'justify-end' : 'justify-start'} gap-4`;
                 
-                // 阿米娅的头像 (Left)
+                // [修复关键点] 增加了 items-start 防止拉伸，确保左右布局
+                wrapper.className = `flex w-full animate-fade-in ${isUser ? 'justify-end' : 'justify-start'} items-start gap-4`;
+                
+                // ----------------------------------------------------------------
+                // [头像配置区] - 已改为更安全的 img 标签模式
+                // ----------------------------------------------------------------
                 const amiyaAvatarHtml = !isUser ? `
                     <div class="shrink-0 flex flex-col items-center gap-1">
-                        <!-- ---------------------------------------------------------------- -->
-                        <!-- [修改说明] 在这里替换阿米娅的头像链接 -->
-                        <!-- 修改下方 url(...) 中的内容即可 -->
-                        <!-- ---------------------------------------------------------------- -->
-                        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-neutral-200 avatar-frame avatar-amiya shadow-md rounded-sm overflow-hidden bg-cover bg-center" 
-                             style="background-image: url('./IMG_20251223_113107.png'); background-color: #e5e5e5;">
-                             <!-- 占位图，如果加载失败显示灰色 -->
-                        </div>
+                        <!-- 请在 src="" 引号内填入图片链接 -->
+                        <img 
+                            src="./IMG_20251223_113107.png" 
+                            class="w-10 h-10 sm:w-12 sm:h-12 bg-neutral-200 shadow-md rounded-sm object-cover border-2 border-white/80"
+                            alt="Amiya"
+                        >
                         <span class="text-[10px] font-mono text-neutral-400 tracking-wider">AMIYA</span>
                     </div>
                 ` : '';
+                // ----------------------------------------------------------------
 
-                // 博士的头像 (Right) - 仅在大屏显示或简化
                 const doctorAvatarHtml = isUser ? `
                      <div class="hidden sm:flex shrink-0 flex-col items-center gap-1">
                         <div class="w-10 h-10 bg-neutral-800 border-2 border-neutral-600 shadow-md rounded-sm flex items-center justify-center">
@@ -436,9 +437,13 @@
                     </div>
                 ` : '';
 
-                // 消息气泡
                 // 解析 Markdown
-                const contentHtml = marked.parse(msg.content);
+                let contentHtml = msg.content;
+                if (typeof marked !== 'undefined') {
+                    contentHtml = marked.parse(msg.content);
+                } else {
+                    contentHtml = msg.content.replace(/\n/g, '<br>');
+                }
 
                 const bubbleHtml = `
                     <div class="flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[80%] sm:max-w-[70%]">
@@ -447,9 +452,7 @@
                                 ? 'bg-neutral-800 text-neutral-100 clip-msg-doctor border border-neutral-700' 
                                 : 'bg-white text-neutral-800 clip-msg-amiya border border-neutral-100'
                             }">
-                            <!-- 装饰线条 -->
                             ${!isUser ? '<div class="absolute top-0 left-0 w-1 h-full bg-sky-400/50"></div>' : ''}
-                            
                             <div class="prose prose-sm ${isUser ? 'prose-invert' : 'prose-neutral'} max-w-none break-words">
                                 ${contentHtml}
                             </div>
@@ -460,8 +463,8 @@
                 wrapper.innerHTML = isUser ? (bubbleHtml + doctorAvatarHtml) : (amiyaAvatarHtml + bubbleHtml);
                 chatContainer.appendChild(wrapper);
             });
-
-            lucide.createIcons();
+            
+            if (typeof lucide !== 'undefined') lucide.createIcons();
             scrollToBottom();
         }
 
