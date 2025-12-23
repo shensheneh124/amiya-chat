@@ -484,7 +484,8 @@
                    - Reply B: Questioning/Serious.
                    - Reply C: Casual/Humorous/Teasing.
                 2. 字数自定，在进行复杂回复的时候可以多加点字
-                3. Return ONLY a JSON array of strings. e.g. ["明白", "为什么？", "太累了"].
+                3.建议回复为博士的回复既用户的回复，而不是系统的回复。
+                4. Return ONLY a JSON array of strings. e.g. ["明白", "为什么？", "太累了"].
             `;
 
             try {
@@ -599,7 +600,7 @@
         async function analyzeForTasks(lastUserMsg, lastAiMsg) {
             if (!apiKey) return;
             taskAnalyzingIndicator.classList.remove('hidden');
-            const extractPrompt = `Role: 罗德岛日程记录终端. Context: 博士(User)与阿米娅(Assistant)的对话. Task: 分析**双方**对话，提取日程、会议、任务提醒。提取规则: 1. 高灵敏度，包括非命令式陈述。 2. 双向捕捉。 3. 无明确时间填"待定"。 4. 多个任务拆分。 Output: JSON数组，格式 [{"task":"...", "time":"..."}]，无Markdown。`;
+            const extractPrompt = `Role: 罗德岛日程记录终端. Context: 博士(User)与阿米娅(Assistant)的对话. Task: 分析**双方**对话，提取日程、会议、任务提醒。提取规则: 1. 高灵敏度，包括非命令式陈述。 2. 双向捕捉。 3. 无明确时间填"待定"。 4. 多个任务拆分。 5.仔细思考是博士的事务还是别人的事务，只有博士的事务才需提取。Output: JSON数组，格式 [{"task":"...", "time":"..."}]，无Markdown。`;
             const conversation = `User: "${lastUserMsg}"\nAssistant: "${lastAiMsg}"`;
             try {
                 const response = await fetch('https://api.deepseek.com/chat/completions', {
@@ -687,13 +688,15 @@
                     apiMessages[sysIndex].content += `
                     
                     【深度思考模式已开启】
-                    1. 你的回答篇幅要越长越好，内容要极度详尽，分析要全面。
+                    1. 你的回答篇幅要越长越好，内容要极度详尽，分析要全面。回答里必须要有内容，但内心的描写写在思维链中
                     2. 【好感度评估系统启动】：
                        请在你的思维链（Reasoning Process）中，评估博士这句话对你的触动，记住一定要在思维链中，不要在回答里。
                        如果博士的话让你感到温暖、开心或默契，好感度增加（+1 到 +5）。
                        如果博士的话让你难过或失望，好感度减少（-1 到 -5）。
                        请在思维链的最后，**必须**严格按此格式写出：【信赖变更：+X】 或 【信赖变更：-X】。
                        如果没有特别的情感波动，写 【信赖变更：+0】。
+                       在回复中，应每段回复做出一次好感度增减的判定
+                       无论是用户回复的还是推荐回复的，阿米娅在回复后都应做出一次好感度增减的判断，记住在每次阿米娅说的话的思维链中加入好感度的判定
                     `;
                 }
             }
