@@ -403,7 +403,7 @@
                 deepThoughtBtn.className = "flex items-center gap-2 px-3 py-1 text-xs font-bold text-white bg-indigo-500 hover:bg-indigo-600 transition-all duration-300 rounded-sm border border-indigo-400 clip-tag shadow-md";
                 deepThoughtBtn.innerHTML = `<i data-lucide="sparkles" width="12"></i><span>认真思考 ON</span>`;
                 inputWrapper.classList.add('deep-thought-active');
-                userInput.placeholder = "阿米娅正全速运转中，请下达复杂指令...";
+                userInput.placeholder = "阿米娅全速运转中，请下达复杂指令...";
             } else {
                 deepThoughtBtn.className = "flex items-center gap-2 px-3 py-1 text-xs font-bold text-neutral-400 bg-neutral-100 hover:bg-neutral-200 transition-all duration-300 rounded-sm border border-neutral-200/50 clip-tag";
                 deepThoughtBtn.innerHTML = `<i data-lucide="sparkles" width="12"></i><span>认真思考</span>`;
@@ -487,23 +487,32 @@
             localStorage.setItem('prts_todo_list', JSON.stringify(todoList));
         }
 
-        // 调用 DeepSeek 提取待办事项 (升级版：提取时间)
+        // 调用 DeepSeek 提取待办事项 (升级版：双向+多任务+高灵敏)
         async function analyzeForTasks(lastUserMsg, lastAiMsg) {
             if (!apiKey) return;
             
             taskAnalyzingIndicator.classList.remove('hidden');
             
-            // 构建提取指令
+            // -------------------------------------------------------------
+            // [提示词升级] 核心修改区域
+            // -------------------------------------------------------------
             const extractPrompt = `
-                Role: 个人秘书.
+                Role: 罗德岛日程记录终端.
                 Context: 博士(User)与阿米娅(Assistant)的对话.
-                Task: 分析最后一次对话. 如果用户明确要求安排日程、提醒事项，或阿米娅确认了新任务，请提取出来.
-                Output: 返回一个 JSON 数组. 格式: [{"task": "事务内容", "time": "时间(如果没有则填'待定')"}].
-                如果没有新任务，返回空数组 [].
-                不要输出 Markdown 代码块，仅返回 JSON 字符串.
+                Task: 请仔细分析**双方**的对话内容。只要对话中出现了需要博士参与的日程、会议、任务，或者需要提醒博士的事项，无论是博士提出的，还是阿米娅通知的，都必须提取为待办事项。
                 
-                例如:
-                用户: "明天下午2点提醒我开会" -> [{"task": "开会", "time": "明天下午2点"}]
+                提取规则:
+                1. 灵敏度要高：哪怕是"明天要去龙门"、"下午有个会议"、"记得吃药"、"日程表上写着..." 这种非命令式的陈述，也要捕捉。
+                2. 双向捕捉：
+                   - 如果阿米娅说 "博士，下午三点要参加医疗部会议"，提取：task="参加医疗部会议", time="下午三点"。
+                   - 如果博士说 "我明天早上要去采购"，提取：task="去采购", time="明天早上"。
+                3. 如果没有明确时间，time填"待定"。
+                4. 请使用中文返回。
+                5. 如果对话中包含多个不同的任务（例如：上午开会，下午去采购），请将它们拆分为多个独立的条目返回。
+                
+                Output: 只返回一个标准的 JSON 数组，不要包含Markdown标记。
+                格式: [{"task": "简练的事务名称", "time": "具体时间描述"}]
+                如果没有检测到新事项，返回 []。
             `;
             
             const conversation = `User: "${lastUserMsg}"\nAssistant: "${lastAiMsg}"`;
