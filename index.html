@@ -588,14 +588,20 @@
         function renderMessages() {
             chatContainer.innerHTML = '';
             messages.forEach((msg, index) => {
-                if(msg.role === 'system') return;
+                if(msg.role === 'system') return; // 不显示系统提示词
 
                 const isUser = msg.role === 'user';
                 const wrapper = document.createElement('div');
+                
+                // [修复关键点] 增加了 items-start 防止拉伸，确保左右布局
                 wrapper.className = `flex w-full animate-fade-in ${isUser ? 'justify-end' : 'justify-start'} items-start gap-4`;
                 
+                // ----------------------------------------------------------------
+                // [头像配置区] - 使用您上传代码中的本地图片路径
+                // ----------------------------------------------------------------
                 const amiyaAvatarHtml = !isUser ? `
                     <div class="shrink-0 flex flex-col items-center gap-1">
+                        <!-- 请在 src="" 引号内填入图片链接 -->
                         <img 
                             src="./IMG_20251223_113107.png" 
                             class="w-10 h-10 sm:w-12 sm:h-12 bg-neutral-200 shadow-md rounded-sm object-cover border-2 border-white/80"
@@ -604,6 +610,7 @@
                         <span class="text-[10px] font-mono text-neutral-400 tracking-wider">AMIYA</span>
                     </div>
                 ` : '';
+                // ----------------------------------------------------------------
 
                 const doctorAvatarHtml = isUser ? `
                      <div class="hidden sm:flex shrink-0 flex-col items-center gap-1">
@@ -614,38 +621,22 @@
                     </div>
                 ` : '';
 
-                let contentHtml = msg.content || '';
+                // 解析 Markdown
+                let contentHtml = msg.content;
                 if (typeof marked !== 'undefined') {
-                    contentHtml = marked.parse(contentHtml);
+                    contentHtml = marked.parse(msg.content);
                 } else {
-                    contentHtml = contentHtml.replace(/\n/g, '<br>');
-                }
-                
-                let reasoningHtml = '';
-                if (!isUser && msg.reasoning_content) {
-                    const uniqueId = 'thinking-' + index;
-                    let reasonText = typeof marked !== 'undefined' ? marked.parse(msg.reasoning_content) : msg.reasoning_content;
-                    reasoningHtml = `
-                        <div class="thinking-toggle" onclick="toggleThinking('${uniqueId}')">
-                            <i data-lucide="brain-circuit" width="12"></i> 
-                            <span>逻辑回路记录...</span>
-                            <i data-lucide="chevron-down" width="12"></i>
-                        </div>
-                        <div id="${uniqueId}" class="thinking-process prose prose-sm prose-neutral max-w-none">
-                            ${reasonText}
-                        </div>
-                    `;
+                    contentHtml = msg.content.replace(/\n/g, '<br>');
                 }
 
                 const bubbleHtml = `
-                    <div class="flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[75%]">
+                    <div class="flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[80%] sm:max-w-[70%]">
                         <div class="relative p-4 sm:p-5 text-sm sm:text-base leading-relaxed shadow-sm backdrop-blur-sm
                             ${isUser 
                                 ? 'bg-neutral-800 text-neutral-100 clip-msg-doctor border border-neutral-700' 
                                 : 'bg-white text-neutral-800 clip-msg-amiya border border-neutral-100'
                             }">
                             ${!isUser ? '<div class="absolute top-0 left-0 w-1 h-full bg-sky-400/50"></div>' : ''}
-                            ${reasoningHtml}
                             <div class="prose prose-sm ${isUser ? 'prose-invert' : 'prose-neutral'} max-w-none break-words">
                                 ${contentHtml}
                             </div>
@@ -656,6 +647,7 @@
                 wrapper.innerHTML = isUser ? (bubbleHtml + doctorAvatarHtml) : (amiyaAvatarHtml + bubbleHtml);
                 chatContainer.appendChild(wrapper);
             });
+            
             if (typeof lucide !== 'undefined') lucide.createIcons();
             scrollToBottom();
         }
@@ -674,17 +666,41 @@
                 return;
             }
 
+            // 用户消息
             messages.push({ role: 'user', content: text });
             userInput.value = '';
-            userInput.style.height = 'auto'; 
+            userInput.style.height = 'auto'; // Reset height
             renderMessages();
             
+            // Loading
             isLoading = true;
             loadingIndicator.classList.remove('hidden');
             scrollToBottom();
 
+            // ----------------------------------------------------------------
+            // [API 切换逻辑] 
+            // ----------------------------------------------------------------
             const defaultUrl = 'https://api.deepseek.com/chat/completions';
             const modelName = isDeepThought ? 'deepseek-reasoner' : 'deepseek-chat';
+
+            // [修改点] 如果是深度思考模式，追加一条系统指令，要求长回答
+            let apiMessages = messages.map(m => ({ role: m.role, content: m.content }));
+            
+            if (isDeepThought) {
+                const sysIndex = apiMessages.findIndex(m => m.role === 'system');
+                if (sysIndex !== -1) {
+                    apiMessages[sysIndex].content += `
+                    
+                    【深度思考模式已开启】
+                    在本次回复中，请务必遵循以下规则：
+                    1. 回答的篇幅**越多越好**，越长越好。
+                    2. 请进行极其详尽、深入、全面的分析。
+                    3. 不要省略任何细节，对每一个观点进行扩展、举例和背景补充。
+                    4. 即使是简单的问题，也要从宏观和微观多个角度进行长篇大论的探讨。
+                    5. 保持阿米娅的语气，但要像撰写详细的研究报告一样详实。
+                    `;
+                }
+            }
 
             try {
                 const response = await fetch(defaultUrl, {
@@ -695,7 +711,7 @@
                     },
                     body: JSON.stringify({
                         model: modelName,
-                        messages: messages.map(m => ({ role: m.role, content: m.content })),
+                        messages: apiMessages,
                         temperature: isDeepThought ? 0.6 : 1.0, 
                         max_tokens: isDeepThought ? 8000 : 4096,
                         stream: false
